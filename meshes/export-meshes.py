@@ -86,6 +86,27 @@ for name in to_write:
 		else:
 			uvs = obj.data.uv_layers.active.data
 
+	itemColor = (1.0,1.0,1.0)
+	if (name == "Cube"):
+		itemColor = (1.0, 0, 0)
+	if (name == "PB"):
+		itemColor = (0.7, .7, .7)
+	if (name == "J"):
+		itemColor = (0.30, 0.20, 0.3);
+	if (name == "bread"):
+		itemColor = (.9, .9, .9);
+	if (name == "Doll"):
+		itemColor = (0.8, 0.6, 0.4);
+	if (name == "Tile"):
+		itemColor = (0.165, 0.42, 0.42);
+
+	#activate vertex colors. Code to activate colors from: 
+	#https://blender.stackexchange.com/questions/8560/apply-vertex-paint-to-a-vertex
+	if mesh.vertex_colors:
+		vertexColor_layer = mesh.vertex_colors.active
+	else:
+		vertexColor_layer = mesh.vertex_colors.new()
+  
 	#write the mesh:
 	for poly in mesh.polygons:
 		assert(len(poly.loop_indices) == 3)
@@ -99,7 +120,8 @@ for name in to_write:
 				data += struct.pack('f', x)
 			#TODO: set 'col' based on object's active vertex colors array.
 			# you should be able to use code much like the texcoord code below.
-			col = mathutils.Color((1.0, 1.0, 1.0))
+			#col = mathutils.Color((1.0, 1.0, 1.0))
+			col = mathutils.Color(itemColor)
 			data += struct.pack('BBBB', int(col.r * 255), int(col.g * 255), int(col.b * 255), 255)
 
 			if do_texcoord:

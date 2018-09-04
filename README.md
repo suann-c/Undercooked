@@ -1,11 +1,11 @@
 # Game Information
 (Note: fill in this portion with information about your game.)
 
-Title: (TODO: your game's title)
+Title: Undercooked
 
-Author: (TODO: your name)
+Author: Suann Chi
 
-Design Document: [TODO: name of design document](TODO: link to design document)
+Design Document: [Undercooked](http://graphics.cs.cmu.edu/courses/15-466-f18/game0-designs/jgualtie/)
 
 Screen Shot:
 
@@ -13,11 +13,11 @@ Screen Shot:
 
 Difficulties Encountered:
 
-TODO: write several sentences about any difficulties you may have encountered in creating the game.
+I had most difficulties debugging resetting for a second round the most, and my bug was that I didn't reset board_meshes properly. I also had a lot of difficulty using Blender since I've never used it before. Ended up using meshes from meshes.py and remixed them a little to make bread (white), jelly (purple), peanut butter and the goal (red).
 
 Good Code:
 
-TODO: write a sentence or two about any code you think you did particularly well.
+Created initBoard to centralize initialization for cleaner logic. Since the original documentation didn't say how controls should be done I implemented it using arrow keys and had the avatar pick up items by arrowing again in the same direction.
 
 # Using This Base Code
 

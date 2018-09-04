@@ -28,6 +28,29 @@ struct Game {
 	//draw is called after update:
 	void draw(glm::uvec2 drawable_size);
 
+
+	int board[5][5];
+
+	struct{
+		int PB = 0;
+		int J = 0;
+		int bread = 0;
+	}win;
+
+	//called during initialization of board. places one each of PB, J, bread and
+	//goal in one of the surrounding squares and fills the remainder with empty
+	//squares
+	void spawnFood(std::vector <std::tuple<int, int>> counterSpace);
+
+	//called by chefMove only if the chef is in a boundary square. If the square
+	//in the direction has food in it, the chef will pick it up. If empty,
+	//nothing happens
+	void getFood(int dir);
+
+	void printouts();
+
+	void initBoard();
+
 	//------- opengl resources -------
 
 	//shader program that draws lit objects with vertex colors:
@@ -59,20 +82,21 @@ struct Game {
 	};
 
 	Mesh tile_mesh;
-	Mesh cursor_mesh;
 	Mesh doll_mesh;
-	Mesh egg_mesh;
+	Mesh bread_mesh;
+	Mesh pb_mesh;
+	Mesh j_mesh;
 	Mesh cube_mesh;
 
 	GLuint meshes_for_simple_shading_vao = -1U; //vertex array object that describes how to connect the meshes_vbo to the simple_shading_program
 
 	//------- game state -------
 
-	glm::uvec2 board_size = glm::uvec2(5,4);
+	glm::uvec2 board_size = glm::uvec2(5,5); //CHANGED
 	std::vector< Mesh const * > board_meshes;
 	std::vector< glm::quat > board_rotations;
 
-	glm::uvec2 cursor = glm::vec2(0,0);
+	glm::uvec2 chef = glm::vec2(2,2); //initialize chef position
 
 	struct {
 		bool roll_left = false;

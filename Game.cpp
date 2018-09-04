@@ -173,10 +173,13 @@ Game::Game() {
 			}
 			return f->second;
 		};
+		//CHANGED (removed cursor)
 		tile_mesh = lookup("Tile");
-		cursor_mesh = lookup("Cursor");
+		//cursor_mesh = lookup("Cursor");
 		doll_mesh = lookup("Doll");
-		egg_mesh = lookup("Egg");
+		bread_mesh = lookup("bread");
+		pb_mesh = lookup("PB");
+		j_mesh = lookup("J");
 		cube_mesh = lookup("Cube");
 	}
 
@@ -200,19 +203,98 @@ Game::Game() {
 
 	GL_ERRORS();
 
+	//initialize everything
+	initBoard();
+}
+
+void Game::initBoard() {
 	//----------------
 	//set up game board with meshes and rolls:
 	board_meshes.reserve(board_size.x * board_size.y);
 	board_rotations.reserve(board_size.x * board_size.y);
-	std::mt19937 mt(0xbead1234);
+	//std::mt19937 mt(0xbead1234);
 
-	std::vector< Mesh const * > meshes{ &doll_mesh, &egg_mesh, &cube_mesh };
+	//global win condition
+	struct win;
 
-	for (uint32_t i = 0; i < board_size.x * board_size.y; ++i) {
-		board_meshes.emplace_back(meshes[mt()%meshes.size()]);
-		board_rotations.emplace_back(glm::quat());
+	//initialize chef.x chef.x (for second and onward rounds)
+	chef.x = 2;
+	chef.y = 2;
+
+	//initialize certain squares. 0 means empty square, 1 means square 
+	//with chef in it, 2 is square with jelly, 3 is square with peanut
+	//butter, 4 for square with bread, 5 for goal square and 6 for empty
+	//side squares.
+	//four corner squares are zeros
+	// init board
+	for (uint32_t y = 0; y < board_size.y; ++y) {
+		for (uint32_t x = 0; x < board_size.x; ++x) {
+			if (x == 2 and y == 2) {
+				board[x][y] = 1; // set chef position
+			}
+			else {
+				board[x][y] = 0; // init other positions
+								 // set outside board 
+				if ((y == 0 and (x>0 and x<4)) || (y == 4 and (x>0 and x<4)) || 
+					(x == 0 and (y>0 and y<4)) || (x == 4 and (y>0 and y<4))) {
+					board[x][y] = 6; // init other positions
+				}
+			}
+		}
 	}
-}
+
+	//Game::spawnFood to add food randomly to the surrounding squares
+	std::vector <std::tuple<int, int>> fillIn;
+	//put in stuff to vector
+	fillIn.push_back(std::tuple<int, int>(0,1));
+	fillIn.push_back(std::tuple<int, int>(0,2));
+	fillIn.push_back(std::tuple<int, int>(0,3));
+	fillIn.push_back(std::tuple<int, int>(1,0));
+	fillIn.push_back(std::tuple<int, int>(2,0));
+	fillIn.push_back(std::tuple<int, int>(3,0));
+	fillIn.push_back(std::tuple<int, int>(4,1));
+	fillIn.push_back(std::tuple<int, int>(4,2));
+	fillIn.push_back(std::tuple<int, int>(4,3));
+	fillIn.push_back(std::tuple<int, int>(1,4));
+	fillIn.push_back(std::tuple<int, int>(2,4));
+	fillIn.push_back(std::tuple<int, int>(3,4));
+	Game::spawnFood(fillIn);
+
+	std::vector< Mesh const * > meshes{&doll_mesh, &pb_mesh, &cube_mesh, &bread_mesh, &j_mesh};
+
+	//initializing board_meshes
+	int val;
+	for (int i=0; i<board_size.x; i++) {
+		for (int j=0; j<board_size.y; j++) {
+			val = board[i][j];
+			int ind = i*board_size.x + j;
+			//std::cout << "val is " << val << std::endl;
+			if (val == 1) { //draw person
+				board_meshes[ind] = meshes[0];
+			}
+			else if (val > 1 and val < 6) { 
+				//draw generic item (PB,J,bread,goal)
+				if (val == 2) { //j
+					board_meshes[ind] = meshes[4];
+				}
+				else if (val == 3) { //pb
+					board_meshes[ind] = meshes[1];
+				}
+				else if (val == 4) { //bread
+					board_meshes[ind] = meshes[3];
+				}
+				else { //goal
+					board_meshes[ind] = meshes[2];
+				}
+			}
+			else {
+				board_meshes[ind] = nullptr;
+			}
+			board_rotations.emplace_back(glm::quat());
+		}
+	}
+} 
+
 
 Game::~Game() {
 	glDeleteVertexArrays(1, &meshes_for_simple_shading_vao);
@@ -227,47 +309,172 @@ Game::~Game() {
 	GL_ERRORS();
 }
 
+//CHANGED (coded spawnFood, and getFood)
+void Game::spawnFood(std::vector <std::tuple<int, int>> counterSpace) {
+	srand(time(NULL));
+	//fill in all 12 spaces around the chef with something
+	int x;
+	int y;
+	int ind;
+	int len = counterSpace.size();
+	for (int i=0; i<4; i++) {
+		//randomly pick one from list
+		ind = rand()%len;
+		//std::cout << "random val is " << ind << std::endl;
+		x = std::get<0>(counterSpace[ind]);
+		y = std::get<1>(counterSpace[ind]);
+		//std::cout << "x is " << x << std::endl;
+		//std::cout << "y is " << y << std::endl;
+		if (i == 0) { //pick place for PB
+			board[x][y] = 3;
+		}
+		else if (i == 1) { //pick place for J
+			board[x][y] = 2;
+		}
+		else if (i == 2) { //pick place for bread
+			board[x][y] = 4;
+		}
+		else { //pick a place for goal square
+			board[x][y] = 5;
+		}
+		len -= 1; //so when picking again there is no out of range
+		//delete it entirely from vector
+		counterSpace.erase(counterSpace.begin()+ind);
+	}
+}
+
+void Game::getFood(int dir) {
+	int item;
+	int x;
+	int y;
+	if (dir == 0) { //pick up something a row above
+		//check board[chefRow-1][chefCol] for item
+		x = chef.x-1;
+		y = chef.y;
+		item = board[x][y];
+	}
+	else if (dir == 1) { //pick up something a row below
+		//check board[chefRow+1][chefCol] for item
+		x = chef.x+1;
+		y = chef.y;
+		item = board[x][y];
+	}
+	else if (dir == 2) { //pick up something to the left
+		//check board[chefRow][chefCol-1] for item
+		x = chef.x;
+		y = chef.y-1;
+		item = board[x][y];
+	}
+	else { //dir == 3 aka pick up something to the right
+		//check board[chefRow][chefCol+1] for item
+		x = chef.x;
+		y = chef.y+1;
+		item = board[x][y];
+	}
+	if (item > 1 and item < 6) { //non empty and non illegal
+		if (item == 5) { //goal square
+			if (win.PB == 1 and win.J == 1 and win.bread == 1) {
+				//round won! reset some variables
+				//set everything to zero for second and onward rounds
+				win.PB = 0;
+				win.J = 0;
+				win.bread = 0;
+				initBoard();
+			}
+		}
+		else {
+			if (item == 3) {//PB
+				win.PB = 1;
+			}
+			else if (item == 2) {//J
+				win.J = 1;
+			}
+			else {//bread
+				win.bread = 1;
+			}
+			//update the board
+			board[x][y] = 6;
+			int ind = board_size.x*x+y;
+			board_meshes[ind] = nullptr;
+		}
+	}
+}
+
+void Game::printouts() {
+	std::cout << "chef.x is: " << chef.x << " and chef.y is: "<< chef.y << std::endl;
+	//print out the board
+	for (int i=0; i<5; i++) {
+		for (int j=0; j<5; j++) {
+			std::cout<<"board at "<<i<<", "<<j<<"is: "<<board[i][j]<<std::endl;
+		}
+	}
+}
+
 bool Game::handle_event(SDL_Event const &evt, glm::uvec2 window_size) {
 	//ignore any keys that are the result of automatic key repeat:
 	if (evt.type == SDL_KEYDOWN && evt.key.repeat) {
 		return false;
 	}
-	//handle tracking the state of WSAD for roll control:
-	if (evt.type == SDL_KEYDOWN || evt.type == SDL_KEYUP) {
-		if (evt.key.keysym.scancode == SDL_SCANCODE_W) {
-			controls.roll_up = (evt.type == SDL_KEYDOWN);
-			return true;
-		} else if (evt.key.keysym.scancode == SDL_SCANCODE_S) {
-			controls.roll_down = (evt.type == SDL_KEYDOWN);
-			return true;
-		} else if (evt.key.keysym.scancode == SDL_SCANCODE_A) {
-			controls.roll_left = (evt.type == SDL_KEYDOWN);
-			return true;
-		} else if (evt.key.keysym.scancode == SDL_SCANCODE_D) {
-			controls.roll_right = (evt.type == SDL_KEYDOWN);
+	//move chef on L/R/U/D press:
+	if (evt.type == SDL_KEYDOWN && evt.key.repeat == 0) {
+		//move chef one square to or pick up item
+		if (evt.key.keysym.scancode == SDL_SCANCODE_UP) { //up arrow pressed
+			if (chef.x == 3) { //call getFood
+				getFood(1);
+			}
+			if (chef.x < 3) { //move chef one row down
+				board[chef.x][chef.y] = 0;
+				int oldInd = board_size.x*chef.x + chef.y;
+				board_meshes[oldInd] = nullptr;
+				chef.x += 1;
+				board[chef.x][chef.y] = 1; //move chef's representation on board
+				int newInd = board_size.x*chef.x + chef.y;
+				board_meshes[newInd] = &doll_mesh;
+			}
 			return true;
 		}
-	}
-	//move cursor on L/R/U/D press:
-	if (evt.type == SDL_KEYDOWN && evt.key.repeat == 0) {
-		if (evt.key.keysym.scancode == SDL_SCANCODE_LEFT) {
-			if (cursor.x > 0) {
-				cursor.x -= 1;
+		else if (evt.key.keysym.scancode == SDL_SCANCODE_DOWN) { //down arrow pressed
+			if (chef.x == 1) { //call getFood
+				getFood(0);
+			}
+			if (chef.x > 1) { //move chef one row up
+				board[chef.x][chef.y] = 0;
+				int oldInd = board_size.x*chef.x + chef.y;
+				board_meshes[oldInd] = nullptr;
+				chef.x -= 1;
+				board[chef.x][chef.y] = 1; //move chef's representation on board
+				int newInd = board_size.x*chef.x + chef.y;
+				board_meshes[newInd] = &doll_mesh;
 			}
 			return true;
-		} else if (evt.key.keysym.scancode == SDL_SCANCODE_RIGHT) {
-			if (cursor.x + 1 < board_size.x) {
-				cursor.x += 1;
+		}
+		else if (evt.key.keysym.scancode == SDL_SCANCODE_LEFT) { //left arrow pressed
+			if (chef.y == 1) { //call getFood
+				getFood(2);
+			}
+			if (chef.y > 1) { //move chef one col left
+				board[chef.x][chef.y] = 0;
+				int oldInd = board_size.x*chef.x + chef.y;
+				board_meshes[oldInd] = nullptr;
+				chef.y -= 1;
+				board[chef.x][chef.y] = 1; //move chef's representation on board
+				int newInd = board_size.x*chef.x + chef.y;
+				board_meshes[newInd] = &doll_mesh;
 			}
 			return true;
-		} else if (evt.key.keysym.scancode == SDL_SCANCODE_UP) {
-			if (cursor.y + 1 < board_size.y) {
-				cursor.y += 1;
+		}
+		else if (evt.key.keysym.scancode == SDL_SCANCODE_RIGHT) { //right arrow pressed
+			if (chef.y == 3) { //call getFood
+				getFood(3);
 			}
-			return true;
-		} else if (evt.key.keysym.scancode == SDL_SCANCODE_DOWN) {
-			if (cursor.y > 0) {
-				cursor.y -= 1;
+			if (chef.y < 3) { //move chef one col right
+				board[chef.x][chef.y] = 0;
+				int oldInd = board_size.x*chef.x + chef.y;
+				board_meshes[oldInd] = nullptr;
+				chef.y += 1;
+				board[chef.x][chef.y] = 1; //move chef's representation on board
+				int newInd = board_size.x*chef.x + chef.y;
+				board_meshes[newInd] = &doll_mesh;
 			}
 			return true;
 		}
@@ -276,7 +483,7 @@ bool Game::handle_event(SDL_Event const &evt, glm::uvec2 window_size) {
 }
 
 void Game::update(float elapsed) {
-	//if the roll keys are pressed, rotate everything on the same row or column as the cursor:
+	/*
 	glm::quat dr = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 	float amt = elapsed * 1.0f;
 	if (controls.roll_left) {
@@ -303,6 +510,7 @@ void Game::update(float elapsed) {
 			}
 		}
 	}
+	*/
 }
 
 void Game::draw(glm::uvec2 drawable_size) {
@@ -368,26 +576,21 @@ void Game::draw(glm::uvec2 drawable_size) {
 					x+0.5f, y+0.5f,-0.5f, 1.0f
 				)
 			);
-			draw_mesh(*board_meshes[y*board_size.x+x],
-				glm::mat4(
-					1.0f, 0.0f, 0.0f, 0.0f,
-					0.0f, 1.0f, 0.0f, 0.0f,
-					0.0f, 0.0f, 1.0f, 0.0f,
-					x+0.5f, y+0.5f, 0.0f, 1.0f
-				)
-				* glm::mat4_cast(board_rotations[y*board_size.x+x])
-			);
+			int val = board[y][x];
+			//std::cout << "val is " << val << std::endl;
+			if (val==1 || val==2 || val==3 || val==4 || val==5 ) {
+				draw_mesh(*board_meshes[y*board_size.x+x],
+					glm::mat4(
+						1.0f, 0.0f, 0.0f, 0.0f,
+						0.0f, 1.0f, 0.0f, 0.0f,
+						0.0f, 0.0f, 1.0f, 0.0f,
+						x+0.5f, y+0.5f, 0.0f, 1.0f
+					)
+					* glm::mat4_cast(board_rotations[y*board_size.x+x])
+				);
+			}
 		}
 	}
-	draw_mesh(cursor_mesh,
-		glm::mat4(
-			1.0f, 0.0f, 0.0f, 0.0f,
-			0.0f, 1.0f, 0.0f, 0.0f,
-			0.0f, 0.0f, 1.0f, 0.0f,
-			cursor.x+0.5f, cursor.y+0.5f, 0.0f, 1.0f
-		)
-	);
-
 
 	glUseProgram(0);
 
